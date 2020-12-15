@@ -1,0 +1,100 @@
+Parameters:
+  VPCStack:
+    Description: The name of the VPC stack
+    Type: String
+    Default: saga-ra2-vpc
+
+  DBUser:
+    Type: String
+    Default: saga-dev
+  DBAdmin:
+    Type: String
+    Default: admin
+  DBUserPass:
+    Type: String
+  DBAdminPass:
+    Type: String
+  DBName:
+    Type: String
+    Default: saga
+
+Resources:
+  MongoDBInstance:
+    Type: "AWS::EC2::Instance"
+    Properties:
+      #IamInstanceProfile: String
+      ImageId: ami-09f765d333a8ebb4b # hardcoded
+      InstanceType: t2.small # hardcoded
+      KeyName: sydney
+      SecurityGroupIds:
+        - !GetAtt MongoDBSecurityGroup.GroupId
+      SubnetId: 
+        Fn::ImportValue: !Sub ${VPCStack}-PrivateSubnet1
+      UserData: 
+        Fn::Base64: !Sub |
+          #!/bin/bash
+
+          export DB_USER=${DBUser}
+          export DB_ADMIN=${DBAdmin}
+          export DB_USER_PASS=${DBUserPass}
+          export DB_ADMIN_PASS=${DBAdminPass}
+          export DB_NAME=${DBName}
+
+          cat > /etc/environment << 'EOF'
+          DB_USER=${DBUser}
+          DB_ADMIN=${DBAdmin}
+          DB_USER_PASS=${DBUserPass}
+          DB_ADMIN_PASS=${DBAdminPass}
+          DB_NAME=${DBName}
+          EOF
+
+          cat << 'EOF' >> /etc/yum.repos.d/mongodb-org-4.4.repo
+          [mongodb-org-4.4]
+          name=MongoDB Repository
+          baseurl=https://repo.mongodb.org/yum/amazon/2/mongodb-org/4.4/x86_64/
+          gpgcheck=1
+          enabled=1
+          gpgkey=https://www.mongodb.org/static/pgp/server-4.4.asc
+          EOF
+
+          yum install -y mongodb-org
+
+          systemctl start mongod
+          systemctl enable mongod
+
+          cp -f saga-ra1/infrastructure/mongod.conf /etc/
+
+          mongo --eval "db.createUser({user: '$DB_ADMIN',pwd: '$DB_ADMIN_PASS',roles: ['root']})" admin
+          mongo --eval "db.createUser({user: '$DB_USER',pwd: '$DB_USER_PASS',roles: [{ role: 'readWrite', db:'$DB_NAME'}]})" $DB_NAME
+          systemctl restart mongod
+
+  MongoDBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: MongoDB SG
+      GroupName: MongoDB-SG
+      SecurityGroupEgress: 
+        - IpProtocol: -1
+          FromPort: -1
+          ToPort: -1
+          CidrIp: 0.0.0.0/0
+      SecurityGroupIngress: 
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 27017
+          ToPort: 27017
+          CidrIp:
+            Fn::ImportValue: !Sub ${VPCStack}-VpcCIDR
+      VpcId: 
+        Fn::ImportValue: !Sub ${VPCStack}-VPC
+
+Outputs:
+  MongoDBEndpoint:
+    Description: Endpoint of the MongoDB within the VPC
+    Value: !GetAtt MongoDBInstance.PrivateDnsName
+    Export: 
+      Name: !Sub ${AWS::StackName}-DBEndpoint
+  
