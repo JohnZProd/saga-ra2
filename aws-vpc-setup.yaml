@@ -37,6 +37,9 @@ Resources:
       CidrBlock: !Ref VpcCIDR
       EnableDnsSupport: true
       EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: saga-vpc 
 
   InternetGateway:
     Type: AWS::EC2::InternetGateway
@@ -58,6 +61,9 @@ Resources:
       AvailabilityZone: !Select [ 0, !GetAZs '' ]
       CidrBlock: !Ref PublicSubnet1CIDR
       MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: saga-public-subnet-1 
 
   PublicSubnet2:
     Type: AWS::EC2::Subnet
@@ -66,6 +72,9 @@ Resources:
       AvailabilityZone: !Select [ 1, !GetAZs  '' ]
       CidrBlock: !Ref PublicSubnet2CIDR
       MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: saga-public-subnet-2
 
   PrivateSubnet1:
     Type: AWS::EC2::Subnet
@@ -74,6 +83,9 @@ Resources:
       AvailabilityZone: !Select [ 0, !GetAZs  '' ]
       CidrBlock: !Ref PrivateSubnet1CIDR
       MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: saga-private-subnet-1
 
   PrivateSubnet2:
     Type: AWS::EC2::Subnet
@@ -82,6 +94,9 @@ Resources:
       AvailabilityZone: !Select [ 1, !GetAZs  '' ]
       CidrBlock: !Ref PrivateSubnet2CIDR
       MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: saga-private-subnet-2
 
   NatGateway1EIP:
     Type: AWS::EC2::EIP

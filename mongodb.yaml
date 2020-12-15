@@ -30,9 +30,14 @@ Resources:
         - !GetAtt MongoDBSecurityGroup.GroupId
       SubnetId: 
         Fn::ImportValue: !Sub ${VPCStack}-PrivateSubnet1
+      Tags:
+        - Key: Name
+          Value: saga-ra2-database
       UserData: 
         Fn::Base64: !Sub |
-          #!/bin/bash
+          #!/bin/bash -x
+
+          /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource MongoDBInstance --region ${AWS::Region}
 
           export DB_USER=${DBUser}
           export DB_ADMIN=${DBAdmin}
@@ -67,6 +72,12 @@ Resources:
           mongo --eval "db.createUser({user: '$DB_ADMIN',pwd: '$DB_ADMIN_PASS',roles: ['root']})" admin
           mongo --eval "db.createUser({user: '$DB_USER',pwd: '$DB_USER_PASS',roles: [{ role: 'readWrite', db:'$DB_NAME'}]})" $DB_NAME
           systemctl restart mongod
+
+          /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource MongoDBInstance --region ${AWS::Region}
+
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT5M
 
   MongoDBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
