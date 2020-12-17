@@ -1,0 +1,60 @@
+Resources:
+  CodeBuildProject:
+    Type: "AWS::CodeBuild::Project"
+    Properties:
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Description: 'New topics codebuild'
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:4.0
+        PrivilegedMode: True
+        Type: LINUX_CONTAINER
+        EnvironmentVariables:
+          - Name: AWS_DEFAULT_REGION
+            Value: !Ref AWS::Region
+          - Name: AWS_ACCOUNT_ID
+            Value: !Ref AWS::AccountId
+          - Name: IMAGE_REPO_NAME
+            Value: !Ref NewTopicsRepo
+          - Name: IMAGE_TAG
+            Value: latest
+      Name: New-Topics-Build
+      ServiceRole: !Ref CodeBuildRole
+      Source:
+        Type: GITHUB
+        Location: https://github.com/JohnZProd/new-topics.git
+      Triggers:
+        Webhook: True
+
+
+  CodeBuildRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement: 
+          - Effect: "Allow"
+            Principal: 
+              Service: 
+                - "codebuild.amazonaws.com"
+            Action: 
+              - "sts:AssumeRole"
+      Description: CodeBuild permissions for new topics
+      Policies:
+        - PolicyName: Allow-ECR-S3-Access
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "ecr:*"
+                  - "s3:*"
+                  - "logs:*"
+                Resource: "*"
+      RoleName: CodeBuildRoleForNewTopics
+
+  NewTopicsRepo:
+    Type: "AWS::ECR::Repository"
+    Properties:
+      RepositoryName: saga-new-topics
