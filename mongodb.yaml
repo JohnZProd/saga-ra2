@@ -18,6 +18,10 @@ Parameters:
     Type: String
     Default: saga
 
+  DBConfLocation:
+    Type: String
+    Default: https://raw.githubusercontent.com/JohnZProd/saga-ra2/master/mongod.conf
+
 Resources:
   MongoDBInstance:
     Type: "AWS::EC2::Instance"
@@ -68,8 +72,7 @@ Resources:
           systemctl enable mongod
 
           # grab the mongodb config file
-
-          cp -f saga-ra1/infrastructure/mongod.conf /etc/
+          curl -o /etc/mongod.conf ${DBConfLocation}
 
           mongo --eval "db.createUser({user: '$DB_ADMIN',pwd: '$DB_ADMIN_PASS',roles: ['root']})" admin
           mongo --eval "db.createUser({user: '$DB_USER',pwd: '$DB_USER_PASS',roles: [{ role: 'readWrite', db:'$DB_NAME'}]})" $DB_NAME
