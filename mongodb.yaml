@@ -67,6 +67,8 @@ Resources:
           systemctl start mongod
           systemctl enable mongod
 
+          # grab the mongodb config file
+
           cp -f saga-ra1/infrastructure/mongod.conf /etc/
 
           mongo --eval "db.createUser({user: '$DB_ADMIN',pwd: '$DB_ADMIN_PASS',roles: ['root']})" admin
