@@ -1,0 +1,109 @@
+Parameters:
+  VPCStack:
+    Description: The name of the VPC stack
+    Type: String
+    Default: saga-ra2-vpc
+
+Resources:
+  AutoscalingGroup:
+    Type: "AWS::AutoScaling::AutoScalingGroup"
+    Properties:
+      AutoScalingGroupName: saga-recommender-api
+      DesiredCapacity: 1
+      LaunchConfigurationName: !Ref InstanceLaunchConfig
+      MaxSize: 1
+      MinSize: 1
+      TargetGroupARNs:
+        - !Ref ELBTargetGroup
+      VPCZoneIdentifier:
+        - Fn::ImportValue: !Sub ${VPCStack}-PrivateSubnet1
+        - Fn::ImportValue: !Sub ${VPCStack}-PrivateSubnet2
+
+  InstanceLaunchConfig:
+    Type: "AWS::AutoScaling::LaunchConfiguration"
+    Properties:
+      ImageId: ami-09f765d333a8ebb4b
+      InstanceType: t2.small
+      KeyName: sydney
+      LaunchConfigurationName: saga-instance-lc
+      SecurityGroups:
+        - !Ref InstanceSecurityGroup
+      UserData: 
+        Fn::Base64: !Sub |
+          #!/bin/bash
+
+          amazon-linux-extras install nginx1 -y
+
+          systemctl start nginx
+          systemctl enable nginx
+
+  InstanceSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: saga-instance-sg
+      GroupName: saga-instance-sg
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref ELBSecurityGroup
+      VpcId:
+        Fn::ImportValue: !Sub ${VPCStack}-VPC
+
+  ApplicationLoadBalancer:
+    Type: "AWS::ElasticLoadBalancingV2::LoadBalancer"
+    Properties:
+      #LoadBalancerAttributes:
+      #  - LoadBalancerAttribute
+      Name: saga-recommender-api
+      Scheme: internet-facing
+      SecurityGroups:
+        - !Ref ELBSecurityGroup
+      Subnets:
+        - Fn::ImportValue: !Sub ${VPCStack}-PublicSubnet1
+        - Fn::ImportValue: !Sub ${VPCStack}-PublicSubnet2
+      Type: application
+  
+  ELBTargetGroup:
+    Type: "AWS::ElasticLoadBalancingV2::TargetGroup"
+    Properties:
+      Name: saga-instance-targetgroup
+      Port: 80
+      Protocol: HTTP
+      TargetType: instance
+      VpcId:
+        Fn::ImportValue: !Sub ${VPCStack}-VPC
+
+  ELBListener:
+    Type: "AWS::ElasticLoadBalancingV2::Listener"
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref ELBTargetGroup
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+  
+  ELBSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: saga-elb-sg
+      GroupName: saga-elb-sg
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      VpcId:
+        Fn::ImportValue: !Sub ${VPCStack}-VPC
+
+  DNSName:
+    Type: "AWS::Route53::RecordSet"
+    Properties:
+      AliasTarget:
+        DNSName: !GetAtt ApplicationLoadBalancer.DNSName
+        HostedZoneId: !GetAtt ApplicationLoadBalancer.CanonicalHostedZoneID
+      HostedZoneName: jz.demilitarised.zone.
+      Name: saga-ra2-api.jz.demilitarised.zone
+      Type: A
+  
