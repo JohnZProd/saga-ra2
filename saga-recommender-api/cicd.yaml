@@ -1,0 +1,180 @@
+Parameters:
+  RecommenderStack:
+    Description: The name of the recommender-api stack
+    Type: String
+    Default: saga-ra2-recommender-api
+
+  DbStack:
+    Description: The name of the mongodb stack
+    Type: String
+    Default: saga-ra2-mongodb
+
+  DBUser:
+    Type: String
+    Default: saga-dev
+  DBUserPass:
+    Type: String
+  DBName:
+    Type: String
+    Default: saga
+
+  ExistingCodeDeployServiceRole:
+    Description: Existing service role ARN
+    Type: String
+    Default: arn:aws:iam::<account-id>:role/CodeDeployServiceRole
+
+Resources:
+
+  CodeStarConnection:
+    Type: AWS::CodeStarConnections::Connection
+    Properties:
+      ConnectionName: github-connection
+      ProviderType: GitHub
+
+  Codepipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      ArtifactStore: 
+        Location: !Ref ArtifactBucket
+        Type: S3
+      Name: saga-ra2-recommender-api-bucket
+      RestartExecutionOnUpdate: true
+      RoleArn: !GetAtt CodepipelineRole.Arn
+      Stages:
+        - Name: Source
+          Actions:
+            - ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: CodeStarSourceConnection
+                Version: 1
+              Configuration:
+                ConnectionArn: !Ref CodeStarConnection
+                FullRepositoryId: JohnZProd/saga-recommender-api
+                BranchName: master
+              Name: Source
+              OutputArtifacts:
+                - Name: SourceCode
+              RunOrder: 1
+        - Name: Build
+          Actions:
+            - ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: 1
+              Configuration:
+                ProjectName: !Ref CodeBuildProject
+              InputArtifacts: 
+                - Name: SourceCode
+              OutputArtifacts:
+                - Name: recommender-api-deploy
+              Name: Build
+        - Name: Deploy
+          Actions:
+            - ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CodeDeploy
+                Version: 1
+              Configuration:
+                ApplicationName: !Ref CodeDeployApplication
+                DeploymentGroupName: !Ref CodeDeployDeploymentGroup
+              InputArtifacts: 
+                - Name: recommender-api-deploy
+              Name: Deploy
+
+  CodeBuildProject:
+    Type: "AWS::CodeBuild::Project"
+    Properties:
+      Artifacts:
+        Type: CODEPIPELINE
+      Description: 'Recommender API codebuild'
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:4.0 #Change image to amazon linux 2
+        Type: LINUX_CONTAINER
+        EnvironmentVariables:
+          - Name: DB_NAME
+            Value: !Ref DBName
+          - Name: DB_USER
+            Value: !Ref DBUser
+          - Name: DB_USER_PASS
+            Value: !Ref DBUserPass
+          - Name: DB_ENDPOINT
+            Value:
+              Fn::ImportValue: !Sub ${DbStack}-DBEndpoint
+      Name: Recommender-API-Build
+      ServiceRole: !Ref CodeBuildRole
+      Source:
+        Type: CODEPIPELINE
+
+  CodeBuildRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement: 
+          - Effect: "Allow"
+            Principal: 
+              Service: 
+                - "codebuild.amazonaws.com"
+            Action: 
+              - "sts:AssumeRole"
+      Description: CodeBuild permissions for recommender api
+      Policies:
+        - PolicyName: Allow-ECR-S3-Access
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "ecr:*"
+                  - "s3:*"
+                  - "logs:*"
+                Resource: "*"
+      RoleName: CodeBuildRoleForRecommenderAPI
+
+  CodeDeployApplication:
+    Type: AWS::CodeDeploy::Application
+    Properties:
+      ApplicationName: saga-recommender-api
+      ComputePlatform: Server
+
+  CodeDeployDeploymentGroup:
+    Type: AWS::CodeDeploy::DeploymentGroup
+    Properties:
+      ApplicationName: !Ref CodeDeployApplication
+      AutoScalingGroups:
+        - Fn::ImportValue: !Sub ${RecommenderStack}-ASG
+      DeploymentGroupName: saga-recommender-api-deployment-group
+      ServiceRoleArn: !Ref ExistingCodeDeployServiceRole
+
+  ArtifactBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: saga-ra2-recommender-api-artifact-bucket
+
+  CodepipelineRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement: 
+          - Effect: "Allow"
+            Principal: 
+              Service: 
+                - "codepipeline.amazonaws.com"
+            Action: 
+              - "sts:AssumeRole"
+      Description: Codepipeline permissions for sitemap
+      Policies:
+        - PolicyName: Allow-All
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "*"
+                Resource: "*"
+      RoleName: CodepipelineRoleForAPI

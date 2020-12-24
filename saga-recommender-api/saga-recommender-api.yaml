@@ -16,26 +16,27 @@ Resources:
       TargetGroupARNs:
         - !Ref ELBTargetGroup
       VPCZoneIdentifier:
-        - Fn::ImportValue: !Sub ${VPCStack}-PrivateSubnet1
-        - Fn::ImportValue: !Sub ${VPCStack}-PrivateSubnet2
+        - Fn::ImportValue: !Sub ${VPCStack}-PublicSubnet1
+        - Fn::ImportValue: !Sub ${VPCStack}-PublicSubnet2
 
   InstanceLaunchConfig:
     Type: "AWS::AutoScaling::LaunchConfiguration"
     Properties:
       ImageId: ami-09f765d333a8ebb4b
       InstanceType: t2.small
+      IamInstanceProfile: !Ref CodeDeployInstanceProfile
       KeyName: sydney
-      LaunchConfigurationName: saga-instance-lc
+      LaunchConfigurationName: saga-instance-launch-config
       SecurityGroups:
         - !Ref InstanceSecurityGroup
       UserData: 
         Fn::Base64: !Sub |
           #!/bin/bash
 
-          amazon-linux-extras install nginx1 -y
-
-          systemctl start nginx
-          systemctl enable nginx
+          cd /home/ec2-user/
+          aws s3 cp 's3://aws-codedeploy-us-east-1/latest/codedeploy-agent.noarch.rpm' .
+          yum install -y ruby
+          yum -y install codedeploy-agent.noarch.rpm
 
   InstanceSecurityGroup:
     Type: "AWS::EC2::SecurityGroup"
@@ -47,6 +48,10 @@ Resources:
           FromPort: 80
           ToPort: 80
           SourceSecurityGroupId: !Ref ELBSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
       VpcId:
         Fn::ImportValue: !Sub ${VPCStack}-VPC
 
@@ -106,4 +111,43 @@ Resources:
       HostedZoneName: jz.demilitarised.zone.
       Name: saga-ra2-api.jz.demilitarised.zone
       Type: A
+
+  CodeDeployIAMRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement: 
+          - Effect: "Allow"
+            Principal: 
+              Service: 
+                - "ec2.amazonaws.com"
+            Action: 
+              - "sts:AssumeRole"
+      Description: Codedeploy instance role
+      Policies:
+        - PolicyName: Codedeployrole
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "s3:Get*"
+                  - "s3:List*"
+                Resource: "*"
+      RoleName: SagaRecommenderAPIInstanceRole
+
+  CodeDeployInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: saga-recommender-api-instance-profile
+      Roles:
+        - !Ref CodeDeployIAMRole
+
+Outputs:
+  AutoscalingGroup:
+    Description: Name of autoscaling group for API instances
+    Value: !Ref AutoscalingGroup
+    Export: 
+      Name: !Sub ${AWS::StackName}-ASG
   
