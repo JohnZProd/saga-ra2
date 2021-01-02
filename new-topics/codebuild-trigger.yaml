@@ -1,0 +1,122 @@
+Parameters:
+
+  VPCStack:
+    Description: The name of the VPC stack
+    Type: String
+    Default: saga-ra2-vpc
+
+  DbStack:
+    Description: The name of the mongodb stack
+    Type: String
+    Default: saga-ra2-mongodb
+
+  DBUser:
+    Type: String
+    Default: saga-dev
+  DBUserPass:
+    Type: String
+  DBName:
+    Type: String
+    Default: saga
+  
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup::Id
+    Default: sg-0ddc17e5d7650e9aa
+
+Resources:
+  CodeBuildProject:
+    Type: "AWS::CodeBuild::Project"
+    Properties:
+      Artifacts: #required
+        Type: NO_ARTIFACTS
+      Description: 'New topics task trigger to create an ECS task'
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:4.0
+        Type: LINUX_CONTAINER
+      Name: New-Topics-Execution
+      ServiceRole: !Ref IAMRole
+      Source:
+        Type: GITHUB
+        Location: https://github.com/JohnZProd/saga-poc.git
+        BuildSpec: !Sub 
+          - |
+            version: 0.2
+
+            phases:
+              pre_build:
+                commands:
+                  - echo "Launching ECS task for new topics"
+              build:
+                commands:
+                  - aws ecs run-task --cluster default --launch-type FARGATE --network-configuration "awsvpcConfiguration={subnets=[${PrivateSubnet1},${PrivateSubnet2}],securityGroups=[${SecurityGroup}],assignPublicIp=DISABLED}" --platform-version LATEST --task-definition ${ECSTaskDefinition} --overrides "containerOverrides=[{name=saga-new-topics,environment=[{name=DB_USER,value=${DBUser}},{name=DB_USER_PASS,value=${DBUserPass}},{name=DB_ENDPOINT,value=${DbEndpoint}},{name=DB_NAME,value=${DBName}},{name=TOPIC_FILE_URL,value=https://raw.githubusercontent.com/JohnZProd/saga-poc/$CODEBUILD_RESOLVED_SOURCE_VERSION/doc_list.txt}]}]"
+              post_build:
+                commands:
+                  - echo "Task launched"
+          - PrivateSubnet1:
+              Fn::ImportValue: !Sub ${VPCStack}-PrivateSubnet1
+            PrivateSubnet2:
+              Fn::ImportValue: !Sub ${VPCStack}-PrivateSubnet2
+            DbEndpoint:
+              Fn::ImportValue: !Sub ${DbStack}-DBEndpoint
+      Triggers:
+        FilterGroups:
+          - - Type: FILE_PATH
+              Pattern: doc_list.txt
+            - Type: EVENT
+              Pattern: PUSH
+        Webhook: True
+
+  IAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement: 
+          - Effect: "Allow"
+            Principal: 
+              Service: 
+                - "codebuild.amazonaws.com"
+            Action: 
+              - "sts:AssumeRole"
+      Description: Allow codebuild to execute the new topics task
+      Policies:
+        - PolicyName: Allow-ECS-Access
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "ecs:*"
+                  - "iam:PassRole"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: "*"
+      RoleName: CodebuildNewTopicsECSTriggerRole
+
+  ECSTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      ExecutionRoleArn: !Sub arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole
+      ContainerDefinitions:
+        - Name: saga-new-topics
+          Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/saga-new-topics:latest
+          LogConfiguration: 
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Sub ${AWS::Region}
+              awslogs-stream-prefix: ecs
+      Cpu: 256
+      Family: saga-new-topics
+      Memory: 512
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - EC2
+        - FARGATE
+
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ecs/saga-new-topics
+      RetentionInDays: 7

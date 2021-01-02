@@ -58,30 +58,3 @@ Resources:
     Type: "AWS::ECR::Repository"
     Properties:
       RepositoryName: saga-sitemap-scraper
-
-  
-#  CodePipeline:
-#    Type: "AWS::CodePipeline::Pipeline"
-#    Properties:
-#      ArtifactStore:
-#        ArtifactStore
-#      Name: Sitemap-Scraper-Pipeline
-#      RoleArn: String #required
-#      Stages:
-#        - Name: Source
-#          Actions:
-#            - Name: SourceAction
-#              ActionTypeId:
-#                Category: Source
-#                Owner: AWS
-#                Provider: CodeStarSourceConnection
-#                Version: 1
-
-#  GithubConnection:
-#    Type: "AWS::CodeStar::GitHubRepository"
-#    Properties:
-#      IsPrivate: False
-#      RepositoryName: sitemap-scraper
-#      RepositoryOwner: JohnZProd
-  
-  
