@@ -30,6 +30,17 @@ Parameters:
     Type: String
     Default: 10.192.21.0/24
 
+  Ra3EKSClusterName:
+    Description: The name of the EKS cluster (from ra3) in this VPC - leave as '' if no cluster
+    Type: String
+    Default: ''
+
+Conditions:
+  TagSubnetsForEKS: !Not
+    - !Equals
+      - !Ref Ra3EKSClusterName
+      - ''
+
 Resources:
   VPC:
     Type: AWS::EC2::VPC
@@ -63,7 +74,12 @@ Resources:
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: saga-public-subnet-1 
+          Value: saga-public-subnet-1
+        - !If
+          - TagSubnetsForEKS
+          - Key: !Sub kubernetes.io/cluster/${Ra3EKSClusterName}
+            Value: shared
+          - !Ref AWS::NoValue
 
   PublicSubnet2:
     Type: AWS::EC2::Subnet
