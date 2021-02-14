@@ -80,6 +80,11 @@ Resources:
           - Key: !Sub kubernetes.io/cluster/${Ra3EKSClusterName}
             Value: shared
           - !Ref AWS::NoValue
+        - !If
+          - TagSubnetsForEKS
+          - Key: kubernetes.io/role/elb
+            Value: 1
+          - !Ref AWS::NoValue
 
   PublicSubnet2:
     Type: AWS::EC2::Subnet
@@ -91,6 +96,16 @@ Resources:
       Tags:
         - Key: Name
           Value: saga-public-subnet-2
+        - !If
+          - TagSubnetsForEKS
+          - Key: !Sub kubernetes.io/cluster/${Ra3EKSClusterName}
+            Value: shared
+          - !Ref AWS::NoValue
+        - !If
+          - TagSubnetsForEKS
+          - Key: kubernetes.io/role/elb
+            Value: 1
+          - !Ref AWS::NoValue
 
   PrivateSubnet1:
     Type: AWS::EC2::Subnet
@@ -102,6 +117,16 @@ Resources:
       Tags:
         - Key: Name
           Value: saga-private-subnet-1
+        - !If
+          - TagSubnetsForEKS
+          - Key: !Sub kubernetes.io/cluster/${Ra3EKSClusterName}
+            Value: shared
+          - !Ref AWS::NoValue
+        - !If
+          - TagSubnetsForEKS
+          - Key: kubernetes.io/role/internal-elb
+            Value: 1
+          - !Ref AWS::NoValue
 
   PrivateSubnet2:
     Type: AWS::EC2::Subnet
@@ -113,6 +138,16 @@ Resources:
       Tags:
         - Key: Name
           Value: saga-private-subnet-2
+        - !If
+          - TagSubnetsForEKS
+          - Key: !Sub kubernetes.io/cluster/${Ra3EKSClusterName}
+            Value: shared
+          - !Ref AWS::NoValue
+        - !If
+          - TagSubnetsForEKS
+          - Key: kubernetes.io/role/internal-elb
+            Value: 1
+          - !Ref AWS::NoValue
 
   NatGateway1EIP:
     Type: AWS::EC2::EIP
