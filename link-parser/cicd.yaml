@@ -1,0 +1,60 @@
+Resources:
+  CodeBuildProject:
+    Type: "AWS::CodeBuild::Project"
+    Properties:
+      Artifacts: #required
+        Type: NO_ARTIFACTS
+      Description: 'Link parser codebuild'
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:4.0
+        PrivilegedMode: True
+        Type: LINUX_CONTAINER
+        EnvironmentVariables:
+          - Name: AWS_DEFAULT_REGION
+            Value: !Ref AWS::Region
+          - Name: AWS_ACCOUNT_ID
+            Value: !Ref AWS::AccountId
+          - Name: IMAGE_REPO_NAME
+            Value: !Ref LinkParserImageRepo
+          - Name: IMAGE_TAG
+            Value: latest
+      Name: Link-Parser-Build
+      ServiceRole: !Ref CodeBuildRole
+      Source:
+        Type: GITHUB
+        Location: https://github.com/JohnZProd/link-parser.git
+      Triggers:
+        Webhook: True
+
+
+  CodeBuildRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement: 
+          - Effect: "Allow"
+            Principal: 
+              Service: 
+                - "codebuild.amazonaws.com"
+            Action: 
+              - "sts:AssumeRole"
+      Description: CodeBuild permissions for link parser
+      Policies:
+        - PolicyName: Allow-ECR-S3-Access
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "ecr:*"
+                  - "s3:*"
+                  - "logs:*"
+                Resource: "*"
+      RoleName: CodeBuildRoleForLinkParser
+
+  LinkParserImageRepo:
+    Type: "AWS::ECR::Repository"
+    Properties:
+      RepositoryName: saga-link-parser

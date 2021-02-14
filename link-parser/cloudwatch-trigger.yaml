@@ -1,0 +1,126 @@
+Parameters:
+
+  VPCStack:
+    Description: The name of the VPC stack
+    Type: String
+    Default: saga-ra2-vpc
+
+  DbStack:
+    Description: The name of the mongodb stack
+    Type: String
+    Default: saga-ra2-mongodb
+
+  DBUser:
+    Type: String
+    Default: saga-dev
+  DBUserPass:
+    Type: String
+  DBName:
+    Type: String
+    Default: saga
+  
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup::Id
+    Default: sg-0ddc17e5d7650e9aa
+
+Resources:
+  TaskSchedule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Scheduled task to trigger saga-link-parser
+      #EventPattern: Json
+      Name: link-parser-trigger
+      RoleArn: !GetAtt IAMRole.Arn
+      ScheduleExpression: "rate(1 hour)"
+      State: ENABLED
+      Targets:
+        - Arn: !Sub arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:cluster/default
+          Id: default-ecs-cluster
+          RoleArn: !GetAtt IAMRole.Arn
+          EcsParameters:
+            LaunchType: FARGATE
+            NetworkConfiguration:
+              AwsVpcConfiguration:
+                SecurityGroups:
+                  - !Ref SecurityGroup
+                Subnets:
+                  - Fn::ImportValue: !Sub ${VPCStack}-PrivateSubnet1
+                  - Fn::ImportValue: !Sub ${VPCStack}-PrivateSubnet2
+            PlatformVersion: LATEST
+            TaskDefinitionArn: !Ref ECSTaskDefinition
+          Input: !Sub
+            - |
+              {"containerOverrides":[{
+                "name":"saga-link-parser",
+                "environment":[
+                  {
+                    "name":"DB_USER",
+                    "value":"${DBUser}"
+                  },{
+                    "name":"DB_USER_PASS",
+                    "value":"${DBUserPass}"
+                  },{
+                    "name":"DB_ENDPOINT",
+                    "value":"${DbEndpoint}"
+                  },{
+                    "name":"DB_NAME",
+                    "value":"${DBName}"
+                  }
+                ]
+              }]}
+            - DbEndpoint:
+                Fn::ImportValue: !Sub ${DbStack}-DBEndpoint
+
+  IAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement: 
+          - Effect: "Allow"
+            Principal: 
+              Service: 
+                - "events.amazonaws.com"
+            Action: 
+              - "sts:AssumeRole"
+      Description: Allow CloudWatch Events to trigger link-parser
+      Policies:
+        - PolicyName: Allow-ECS-Access
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "ecs:*"
+                  - "iam:PassRole"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: "*"
+      RoleName: CloudWatchLinkParserTriggerRole
+
+  ECSTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      ExecutionRoleArn: !Sub arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole
+      ContainerDefinitions:
+        - Name: saga-link-parser
+          Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/saga-link-parser:latest
+          LogConfiguration: 
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Sub ${AWS::Region}
+              awslogs-stream-prefix: ecs
+      Cpu: 256
+      Family: saga-link-parser
+      Memory: 512
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - EC2
+        - FARGATE
+
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ecs/saga-link-parser
+      RetentionInDays: 7
