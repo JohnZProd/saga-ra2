@@ -95,6 +95,8 @@ Resources:
         Image: golang:1.15
         Type: LINUX_CONTAINER
         EnvironmentVariables:
+          - Name: REFERENCE_ARCHITECTURE
+            Value: ra2
           - Name: DB_NAME
             Value: !Ref DBName
           - Name: DB_USER
