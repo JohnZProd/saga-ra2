@@ -23,7 +23,7 @@ Resources:
       ServiceRole: !Ref CodeBuildRole
       Source:
         Type: GITHUB
-        Location: https://github.com/JohnZProd/link-parser.git
+        Location: https://github.com/buildwithjz/link-parser.git
       Triggers:
         Webhook: True
 
