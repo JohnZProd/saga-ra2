@@ -38,7 +38,7 @@ Resources:
       ServiceRole: !Ref IAMRole
       Source:
         Type: GITHUB
-        Location: https://github.com/JohnZProd/saga-poc.git
+        Location: https://github.com/buildwithjz/saga-poc.git
         BuildSpec: !Sub 
           - |
             version: 0.2
@@ -49,7 +49,7 @@ Resources:
                   - echo "Launching ECS task for new topics"
               build:
                 commands:
-                  - aws ecs run-task --cluster default --launch-type FARGATE --network-configuration "awsvpcConfiguration={subnets=[${PrivateSubnet1},${PrivateSubnet2}],securityGroups=[${SecurityGroup}],assignPublicIp=DISABLED}" --platform-version LATEST --task-definition ${ECSTaskDefinition} --overrides "containerOverrides=[{name=saga-new-topics,environment=[{name=DB_USER,value=${DBUser}},{name=DB_USER_PASS,value=${DBUserPass}},{name=DB_ENDPOINT,value=${DbEndpoint}},{name=DB_NAME,value=${DBName}},{name=TOPIC_FILE_URL,value=https://raw.githubusercontent.com/JohnZProd/saga-poc/$CODEBUILD_RESOLVED_SOURCE_VERSION/doc_list.txt}]}]"
+                  - aws ecs run-task --cluster default --launch-type FARGATE --network-configuration "awsvpcConfiguration={subnets=[${PrivateSubnet1},${PrivateSubnet2}],securityGroups=[${SecurityGroup}],assignPublicIp=DISABLED}" --platform-version LATEST --task-definition ${ECSTaskDefinition} --overrides "containerOverrides=[{name=saga-new-topics,environment=[{name=DB_USER,value=${DBUser}},{name=DB_USER_PASS,value=${DBUserPass}},{name=DB_ENDPOINT,value=${DbEndpoint}},{name=DB_NAME,value=${DBName}},{name=TOPIC_FILE_URL,value=https://raw.githubusercontent.com/buildwithjz/saga-poc/$CODEBUILD_RESOLVED_SOURCE_VERSION/doc_list.txt}]}]"
               post_build:
                 commands:
                   - echo "Task launched"
