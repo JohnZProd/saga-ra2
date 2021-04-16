@@ -20,7 +20,7 @@ Parameters:
 
   DBConfLocation:
     Type: String
-    Default: https://raw.githubusercontent.com/JohnZProd/saga-ra2/master/mongod.conf
+    Default: https://raw.githubusercontent.com/buildwithjz/saga-ra2/master/mongod.conf
 
 Resources:
   MongoDBInstance:
