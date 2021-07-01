@@ -22,14 +22,19 @@ Parameters:
     Type: String
     Default: https://raw.githubusercontent.com/buildwithjz/saga-ra2/master/mongod.conf
 
+  ImageId:
+    Type: AWS::EC2::Image::Id
+  KeyPairName:
+    Type: AWS::EC2::KeyPair::KeyName
+
 Resources:
   MongoDBInstance:
     Type: "AWS::EC2::Instance"
     Properties:
       #IamInstanceProfile: String
-      ImageId: ami-09f765d333a8ebb4b # hardcoded
-      InstanceType: t2.small # hardcoded
-      KeyName: sydney
+      ImageId: !Ref ImageId 
+      InstanceType: t3.medium # hardcoded
+      KeyName: !Ref KeyPairName
       SecurityGroupIds:
         - !GetAtt MongoDBSecurityGroup.GroupId
       SubnetId: 
